@@ -4,7 +4,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use bitcoin::{locktime::Height, LockTime, Sequence};
+    use bitcoin::{locktime::Height, LockTime, Sequence, hashes::hex::ToHex};
     use elements::{encode::deserialize, Block};
 
     #[test]
@@ -25,7 +25,7 @@ mod test {
         let signblockscript = params.signblockscript().unwrap();
 
         // and get the signblock witness
-        let witness = if let elements::BlockExtData::Dynafed {
+        let signblock_witness = if let elements::BlockExtData::Dynafed {
             ref signblock_witness,
             ..
         } = header.ext
@@ -34,7 +34,14 @@ mod test {
         } else {
             panic!("header is not dynafed");
         };
-        let witness = bitcoin::Witness::from_vec(witness.clone());
+        let witness = bitcoin::Witness::from_vec(signblock_witness.clone());
+        println!("witness data");
+        for (i, w) in witness.iter().enumerate() {
+            println!("witness index: {i}");
+            let hex = w.to_hex();
+            println!("hex: {hex}");
+        }
+        println!("---");
 
         // elements::Script and bitcoin::Script are separate newtypes, so convert this as required for miniscript
         let spk: bitcoin::Script = signblockscript.to_bytes().into();
@@ -58,6 +65,7 @@ mod test {
         let sig_check = |sig: &miniscript::interpreter::KeySigPair| match sig {
             miniscript::interpreter::KeySigPair::Ecdsa(key, ecdsa_sig) => {
                 println!("pubkey: {key}");
+                println!("ecdsa_sig: {ecdsa_sig}");
                 secp.verify_ecdsa(&message, &ecdsa_sig.sig, &key.inner)
                     .is_ok()
                     && ecdsa_sig.hash_ty == bitcoin::EcdsaSighashType::All
@@ -71,7 +79,7 @@ mod test {
 
         // stepping through the iterator calls the sig check on each entry
         for (idx, result) in iterator.enumerate() {
-            println!("witness at index: {idx}");
+            println!("iterator index: {idx}");
             match result {
                 Ok(_) => {
                     println!("valid signblock witness at index {idx}");
